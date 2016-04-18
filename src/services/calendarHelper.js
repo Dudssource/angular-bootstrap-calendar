@@ -102,6 +102,15 @@ angular
       return weekdays;
     }
 
+	/*
+	 * Due to some issues using old browsers with problematic javascript engines,
+     * the daylight saving time (DST) changes might causes duplicated days, 
+	 * so we need to check to avoid this behavior.
+	 */
+    function hasDuplicatedDay(days, day) {
+      return ($filter('filter')(days, function(v, i, a) { return v.date.format('DD/MM/YYYY') == day.format('DD/MM/YYYY'); }, true).length != 0);
+    }
+
     function getYearView(events, viewDate, cellModifier) {
 
       var view = [];
@@ -152,21 +161,23 @@ angular
           monthEvents = filterEventsInPeriod(eventsInPeriod, day, day.clone().endOf('day'));
         }
 
-        var cell = {
-          label: day.date(),
-          date: day.clone(),
-          inMonth: inMonth,
-          isPast: today.isAfter(day),
-          isToday: today.isSame(day),
-          isFuture: today.isBefore(day),
-          isWeekend: [0, 6].indexOf(day.day()) > -1,
-          events: monthEvents,
-          badgeTotal: getBadgeTotal(monthEvents)
-        };
+		// we don't add duplicated days
+		if (!hasDuplicatedDay(view, day)) {
+          var cell = {
+            label: day.date(),
+            date: day.clone(),
+            inMonth: inMonth,
+            isPast: today.isAfter(day),
+            isToday: today.isSame(day),
+            isFuture: today.isBefore(day),
+            isWeekend: [0, 6].indexOf(day.day()) > -1,
+            events: monthEvents,
+            badgeTotal: getBadgeTotal(monthEvents)
+          };
 
-        cellModifier({calendarCell: cell});
-
-        view.push(cell);
+          cellModifier({calendarCell: cell});
+          view.push(cell);
+		}
 
         day.add(1, 'day');
       }
@@ -178,20 +189,30 @@ angular
     function getWeekView(events, viewDate) {
 
       var startOfWeek = moment(viewDate).startOf('week');
+
+      // checking if the start of the week is the same as the end of the previous week
+      if (moment(viewDate).subtract(1, 'week').endOf('week').format('DD/MM/YYYY') == startOfWeek.format('DD/MM/YYYY')) {
+        // in this case we increment the day to fix the daylight error
+        startOfWeek.add(1, 'day');
+      }
+
       var endOfWeek = moment(viewDate).endOf('week');
       var dayCounter = startOfWeek.clone();
       var days = [];
       var today = moment().startOf('day');
       while (days.length < 7) {
-        days.push({
-          weekDayLabel: formatDate(dayCounter, calendarConfig.dateFormats.weekDay),
-          date: dayCounter.clone(),
-          dayLabel: formatDate(dayCounter, calendarConfig.dateFormats.day),
-          isPast: dayCounter.isBefore(today),
-          isToday: dayCounter.isSame(today),
-          isFuture: dayCounter.isAfter(today),
-          isWeekend: [0, 6].indexOf(dayCounter.day()) > -1
-        });
+        // we don't add duplicated days
+        if (!hasDuplicatedDay(days, dayCounter)) {
+          days.push({
+            weekDayLabel: formatDate(dayCounter, calendarConfig.dateFormats.weekDay),
+            date: dayCounter.clone(),
+            dayLabel: formatDate(dayCounter, calendarConfig.dateFormats.day),
+            isPast: dayCounter.isBefore(today),
+            isToday: dayCounter.isSame(today),
+            isFuture: dayCounter.isAfter(today),
+            isWeekend: [0, 6].indexOf(dayCounter.day()) > -1
+          });
+		}
         dayCounter.add(1, 'day');
       }
 
